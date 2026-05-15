@@ -24,6 +24,49 @@ function M.init_selection(buf, language)
     end
 end
 
+---@private
+---@param node TSNode
+---@return TSNode?
+---@return TSNode?
+function M.same_type_sibling_range(node)
+    local parent = node:parent()
+    if not parent then
+        return nil, nil
+    end
+    local node_type = node:type()
+    local index = -1
+    for i = 0, parent:named_child_count() - 1 do
+        if parent:named_child(i):id() == node:id() then
+            index = i
+            break
+        end
+    end
+    if index < 0 then
+        return nil, nil
+    end
+
+    local first = index
+    while first > 0 do
+        local sibling = parent:named_child(first - 1)
+        if not sibling or sibling:type() ~= node_type then
+            break
+        end
+        first = first - 1
+    end
+
+    local last = index
+    while last < parent:named_child_count() - 1 do
+        local sibling = parent:named_child(last + 1)
+        if not sibling or sibling:type() ~= node_type then
+            break
+        end
+        last = last + 1
+    end
+
+    return parent:named_child(first), parent:named_child(last)
+end
+
+
 ---@param buf integer
 ---@param language string
 function M.node_incremental(buf, language)
@@ -67,25 +110,53 @@ function M.incremental(buf, language, parent)
     local last = M.nodes:last(buf)
     local node = nil ---@type TSNode?
 
+
     if not last or not range:same(last) then
         -- handle re-initialization
         node = parser:named_node_for_range(range:ts(), {
             ignore_injections = false,
         })
         M.nodes:clear(buf)
-    else
-        -- iterate through parent parsers and nodes until we find a node with
-        -- a different range
-        parser = parser:language_for_range(range:ts())
-        while parser and not node do
-            node = parser:named_node_for_range(range:ts())
-            while node and range:same(Range.node(node)) do
-                node = parent(parser, node)
-            end
-            parser = parser:parent()
+        if node then
+            M.nodes:push(buf, Range.node(node))
+            M.select(Range.node(node))
+        end
+        return
+    end
+
+    local rnode = parser:named_node_for_range(last:ts(), {
+        ignore_injections = false,
+    })
+    local first_sibling, last_sibling = M.same_type_sibling_range(rnode)
+
+    if rnode and first_sibling and last_sibling then
+        if first_sibling:id() ~= rnode:id() or last_sibling:id() ~= rnode:id() then
+            local start_range = Range.node(first_sibling)
+            local end_range = Range.node(last_sibling)
+            vim.print(start_range:cursor_start())
+            vim.print(end_range:cursor_end())
+            local expanded = Range.new({
+                start_range.range[1],
+                start_range.range[2],
+                end_range.range[3],
+                end_range.range[4],
+            })
+            M.nodes:push(buf, expanded)
+            M.select(expanded)
+            return
         end
     end
 
+    -- iterate through parent parsers and nodes until we find a node with
+    -- a different range
+    parser = parser:language_for_range(range:ts())
+    while parser and not node do
+        node = parser:named_node_for_range(range:ts())
+        while node and range:same(Range.node(node)) do
+            node = parent(parser, node)
+        end
+        parser = parser:parent()
+    end
     if node then
         M.nodes:push(buf, Range.node(node))
         M.select(Range.node(node))
