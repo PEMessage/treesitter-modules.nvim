@@ -19,8 +19,8 @@ function M.init_selection(buf, language)
         ignore_injections = false,
     })
     if node then
-        M.nodes:push(buf, node)
-        M.select(node)
+        M.nodes:push(buf, Range.node(node))
+        M.select(Range.node(node))
     end
 end
 
@@ -67,7 +67,7 @@ function M.incremental(buf, language, parent)
     local last = M.nodes:last(buf)
     local node = nil ---@type TSNode?
 
-    if not last or not range:same(Range.node(last)) then
+    if not last or not range:same(last) then
         -- handle re-initialization
         node = parser:named_node_for_range(range:ts(), {
             ignore_injections = false,
@@ -87,8 +87,8 @@ function M.incremental(buf, language, parent)
     end
 
     if node then
-        M.nodes:push(buf, node)
-        M.select(node)
+        M.nodes:push(buf, Range.node(node))
+        M.select(Range.node(node))
     end
 end
 
@@ -126,9 +126,9 @@ function M.node_decremental(buf, language)
     -- NOTE: if a user does incremental selection, moves the cursor, enters
     -- visual mode, then triggers this function, they will still jump back to
     -- their previous selection, this behavior matches the original.
-    local node = M.nodes:pop(buf)
-    if node then
-        M.select(node)
+    local range = M.nodes:pop(buf)
+    if range then
+        M.select(range)
     end
 end
 
@@ -148,9 +148,8 @@ function M.parse(buf, language)
 end
 
 ---@private
----@param node TSNode
-function M.select(node)
-    local range = Range.node(node)
+---@param range ts.mod.Range
+function M.select(range)
     if vim.api.nvim_get_mode().mode ~= 'v' then
         vim.cmd.normal({ 'v', bang = true })
     end

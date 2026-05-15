@@ -1,6 +1,6 @@
 ---@class ts.mod.nodes.Entry
 ---@field tick integer
----@field nodes TSNode[]
+---@field ranges ts.mod.Range[]
 
 ---@class ts.mod.Nodes
 ---@field private entries table<integer, ts.mod.nodes.Entry>
@@ -15,27 +15,27 @@ function Nodes.new()
 end
 
 ---@param buf integer
----@param node TSNode
-function Nodes:push(buf, node)
-    local nodes = self:get(buf)
-    nodes[#nodes + 1] = node
+---@param range ts.mod.Range
+function Nodes:push(buf, range)
+    local ranges = self:get(buf)
+    ranges[#ranges + 1] = range
 end
 
 ---@param buf integer
----@return TSNode?
+---@return ts.mod.Range?
 function Nodes:pop(buf)
-    local nodes = self:get(buf)
-    if #nodes > 0 then
-        nodes[#nodes] = nil
+    local ranges = self:get(buf)
+    if #ranges > 0 then
+        ranges[#ranges] = nil
     end
-    return nodes[#nodes]
+    return ranges[#ranges]
 end
 
 ---@param buf integer
----@return TSNode?
+---@return ts.mod.Range?
 function Nodes:last(buf)
-    local nodes = self:get(buf)
-    return nodes[#nodes]
+    local ranges = self:get(buf)
+    return ranges[#ranges]
 end
 
 ---@param buf integer
@@ -45,17 +45,17 @@ end
 
 ---@private
 ---@param buf integer
----@return TSNode[]
+---@return ts.mod.Range[]
 function Nodes:get(buf)
-    -- clear nodes on change tick, calling any methods on invalid nodes causes
+    -- clear ranges on change tick, calling any methods on invalid nodes causes
     -- neovim to hard crash
     local entry = self.entries[buf]
     local tick = vim.api.nvim_buf_get_changedtick(buf)
     if not entry or entry.tick ~= tick then
-        entry = { tick = tick, nodes = {} }
+        entry = { tick = tick, ranges = {} }
         self.entries[buf] = entry
     end
-    return entry.nodes
+    return entry.ranges
 end
 
 return Nodes
